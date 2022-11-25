@@ -211,7 +211,7 @@ def main():
 		print ("\nError in extracting annotated polyadenylation sites ...\n")
 		exit()
 	if args.expNovel == 1:
-		if ExtractPolyAsites.ExtNovelAPA(args.o, args.outPrefix, args.bed, args.fasta, args.md, args.anchor, args.ip, args.novel_d, args.a, args.p, args.mode,controls+treated,logfile):
+		if ExtractPolyAsites.ExtNovelAPA(args.o, args.outPrefix, args.bed, args.fasta, args.md, args.anchor, args.ip, args.novel_d, args.a, args.p, args.mode,controls+treated,logfile, args.s):
 			localdate = time.strftime('%a %m/%d/%Y')
 			localtime = time.strftime('%H:%M:%S')
 			logfile.write('# Completed extracting de-novo polyadenylation sites : '+localdate+' at: ' + localtime+' \n')

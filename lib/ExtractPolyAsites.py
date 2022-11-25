@@ -27,6 +27,7 @@ def ExtAPAfromPolyA_DB(outDir, fkey, ref_polyA, APAblock, mddb,logfile):
 	#df = pd.read_csv(outDir + fkey + '.APSitesDB.bed', sep='\t', index_col=None, header=None, names=['chr', 'start', 'end', 'strand', 'gene', 'PAtype']) # Worked with bedtools 2.26 but failed with 2.29
 	df = pd.read_csv(outDir + fkey + '.APSitesDB.bed', sep='\t', index_col=None, header=None, names=['chr', 'start', 'end', 'gene', 'PAtype', 'strand']) # Worked with bedtools 2.29
 	df = df[['chr', 'start', 'end', 'gene', 'PAtype', 'strand']]
+	df['chr']=df['chr'].astype(str)
 	df = df[~df['chr'].str.contains('_')]
 	df = df[~df['gene'].str.contains(',')]
 	df.to_csv(outDir + fkey + '.APSitesDB.bed', sep='\t', index=None, header=None)
@@ -38,7 +39,8 @@ def ExtAPAfromPolyA_DB(outDir, fkey, ref_polyA, APAblock, mddb,logfile):
 
 def makeSAF(outDir, fkey):
 	df = pd.read_csv(outDir + fkey + '.APSitesDB.bed', sep='\t', index_col=None, names=['Chr', 'Start', 'End', 'Gene', 'APA', 'Strand'])
-	df['GeneID'] = df['Gene'] + '@' + df['Chr'] + '_' + df['Start'].apply(str) + '_' + df['End'].apply(str) + '_' + df['Strand']
+	print ("makedSAF\n",df)
+	df['GeneID'] = df['Gene'] + '@' + df['Chr'].apply(str) + '_' + df['Start'].apply(str) + '_' + df['End'].apply(str) + '_' + df['Strand']
 	df = df[['GeneID', 'Chr', 'Start', 'End', 'Strand']]
 	df.to_csv(outDir + fkey + '_APA.saf', sep='\t', index=False, header=None)
 	return (1)
@@ -86,15 +88,21 @@ def mergeBG(f):
 	merged.saveas(pars[0].replace('.bg', '.bed'))
 	return(1)
 
-def add_gene_name(a, b):
+def add_gene_name(a, b, strand):
 	os.system('bedtools sort -i ' + a + ' > ' + a.replace('.bed', '.sorted.bed'))
-	cmd = 'bedtools closest -nonamecheck -a ' + a.replace('.bed', '.sorted.bed') + ' -b ' + b + ' -s -id -D a -t first -k 1 > AltPA.temp.gene.bed'
+	s=""
+	if strand == 1: #forwars
+		s=" -s "
+	elif strand == 2:
+		s=" -S "
+	cmd = 'bedtools closest -nonamecheck -a ' + a.replace('.bed', '.sorted.bed') + ' -b ' + b + ' ' + s + ' -id -D a -t first -k 1 > AltPA.temp.gene.bed'
+	print (cmd)
 	os.system(cmd)
 	tempdf = pd.read_csv('AltPA.temp.gene.bed', sep='\t', index_col=None, header=None)
 	tempdf = tempdf.iloc[:, [0, 1, 2, 5, 9, 12]]
 	tempdf.columns = ['Chr', 'Start', 'End', 'Strand', 'Gene', 'Distance']
 	tempdf = tempdf[['Chr', 'Start', 'End', 'Gene', 'Distance', 'Strand']]
-	os.system('rm AltPA.temp.gene.bed ' + a.replace('.bed', '.sorted.bed'))
+	#os.system('rm AltPA.temp.gene.bed ' + a.replace('.bed', '.sorted.bed'))
 	return (tempdf)
 
 def computeA(string, size,prpA):
@@ -105,7 +113,7 @@ def computeA(string, size,prpA):
 			return (0)
 	return (1)
 
-def ExtNovelAPA(outDir, fkey, ref_bed, ref_fasta, md, anchor, iplen, novelD, prpA, npc, mode, samples,logfile):	
+def ExtNovelAPA(outDir, fkey, ref_bed, ref_fasta, md, anchor, iplen, novelD, prpA, npc, mode, samples,logfile, strand):	
 	# Make bged grapg files #
 	if mode =="fastq":
 		files = glob.glob(outDir + '*.bam')
@@ -158,6 +166,7 @@ def ExtNovelAPA(outDir, fkey, ref_bed, ref_fasta, md, anchor, iplen, novelD, prp
 		names.append('3UTR_' + str(n))
 	df['GeneID'] = names
 	df = df[['Chr', 'Start', 'End', 'GeneID', 'GeneID', 'Strand']]
+	print ("ExtractNovelAPA:\n",df)
 	df.to_csv(outDir + fkey + '_denovoAPAsites.bed', sep='\t', index=False, header=None)
 	os.system('rm ' + outDir + fkey + '_Jumbo.bed ' + outDir + fkey + '_merged.features.bed')
 
@@ -166,7 +175,7 @@ def ExtNovelAPA(outDir, fkey, ref_bed, ref_fasta, md, anchor, iplen, novelD, prp
 	logfile.write('# Finished generating features bed file on ' + localdate + ' at: ' + localtime + ' ##\n')
 
 	# add geen names #
-	df = add_gene_name(outDir + fkey + '_denovoAPAsites.bed', ref_bed)
+	df = add_gene_name(outDir + fkey + '_denovoAPAsites.bed', ref_bed, strand)
 	#df = df[df.Distance >= -16000]
 	df = df[df.Distance >= (novelD*-1)]
 	df.to_csv(outDir + fkey + '_denovoAPAsites.bed', sep='\t', index=False, header=None)
@@ -245,7 +254,7 @@ def ExtNovelAPA(outDir, fkey, ref_bed, ref_fasta, md, anchor, iplen, novelD, prp
 	
 	df = pd.read_csv(outDir + fkey + '_denovoAPAsites.bed', sep='\t', index_col=None, header=None, names=['Chr', 'Start', 'End', 'gene_id', 'Distance', 'Strand'])
 	df = df.drop_duplicates(subset=['Chr', 'Start', 'End', 'Strand'])
-	df['GeneID'] = df['gene_id'] + '@' + df['Chr'] + '_' + df['Start'].apply(str) + '_' + df['End'].apply(str) + '_' + df['Strand']
+	df['GeneID'] = df['gene_id'] + '@' + df['Chr'].apply(str) + '_' + df['Start'].apply(str) + '_' + df['End'].apply(str) + '_' + df['Strand']
 	df = df[['GeneID', 'Chr', 'Start', 'End', 'Strand']]
 	df.to_csv(outDir + fkey + '_denovoAPAsites.saf', sep='\t', index=False, header=None)
 	localdate = time.strftime('%a %m/%d/%Y')
